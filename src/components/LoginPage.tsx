@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Shield, Eye, EyeOff, Lock, User, ChevronLeft, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { ROLES } from '../auth/types';
+import { registerUser, logActivity } from '../lib/supabaseService';
 
 type AuthMode = 'select' | 'login' | 'register' | 'forgot';
 
@@ -57,7 +58,7 @@ const LoginPage: React.FC = () => {
     }, 600);
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setMessage('');
@@ -71,10 +72,23 @@ const LoginPage: React.FC = () => {
       return;
     }
 
-    setMessage('Registration submitted. Use your new credentials to sign in once approved.');
-    setRegName('');
-    setRegEmail('');
-    setRegPassword('');
+    setLoading(true);
+    const { error } = await registerUser({
+      full_name: regName.trim(),
+      email: regEmail.trim(),
+      password: regPassword,
+      role: selectedRole!,
+    });
+    setLoading(false);
+    if (error) {
+      setError('Registration failed: ' + error.message);
+    } else {
+      await logActivity('login', `New ${selectedRole} registration: ${regName.trim()}`, regName.trim());
+      setMessage('Registration submitted successfully! Your account is pending approval. Use your credentials to sign in once approved.');
+      setRegName('');
+      setRegEmail('');
+      setRegPassword('');
+    }
   };
 
   const handleForgot = (e: React.FormEvent) => {
@@ -104,7 +118,7 @@ const LoginPage: React.FC = () => {
           <Shield className="w-8 h-8 text-white" />
         </div>
         <h1 className="text-4xl font-bold text-slate-900">Welcome to UDHRS</h1>
-        <p className="text-slate-500 mt-3 text-lg">Unified Digital Health Record System</p>
+        <p className="text-slate-500 mt-3 text-lg">Universal Digital Health Records System</p>
         <p className="text-slate-400 mt-1 text-sm">Role-based access for patients, doctors, labs, pharmacies, records staff and admins.</p>
       </div>
 
@@ -302,7 +316,7 @@ const LoginPage: React.FC = () => {
         {authMode === 'register' && renderRegisterForm()}
         {authMode === 'forgot' && renderForgotForm()}
 
-        <p className="text-center text-slate-500 text-sm">© 2024 UDHRS - Universal Digital Health Records System</p>
+        <p className="text-center text-slate-500 text-sm">© 2025 UDHRS — Universal Digital Health Records System</p>
       </div>
     </div>
   );

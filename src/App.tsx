@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { ToastProvider } from './hooks/useToast';
 import LoginPage from './components/LoginPage';
@@ -10,6 +10,7 @@ import Records from './components/Records';
 import Laboratory from './components/Laboratory';
 import Pharmacy from './components/Pharmacy';
 import ActivityLog from './components/ActivityLog';
+import { getPatients } from './lib/supabaseService';
 
 type Tab = 'dashboard' | 'patients' | 'appointments' | 'records' | 'laboratory' | 'pharmacy' | 'activity';
 
@@ -63,7 +64,7 @@ const AppContent: React.FC = () => {
         collapsed={sidebarCollapsed}
         setCollapsed={setSidebarCollapsed}
       />
-      <main className="flex-1 overflow-auto">
+      <main className={`flex-1 overflow-auto transition-all duration-300 ${sidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
         <div className="p-6 lg:p-8 max-w-[1600px] mx-auto">
           <div className="mb-4 flex flex-col gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm border border-slate-200/70 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3 text-sm text-slate-500">
@@ -94,6 +95,17 @@ const AccessDenied: React.FC = () => (
 
 const PatientRestrictedView: React.FC = () => {
   const { user } = useAuth();
+  const [patientData, setPatientData] = useState<any>(null);
+
+  useEffect(() => {
+    async function load() {
+      const { data } = await getPatients();
+      // Show first patient as demo data for patient role
+      if (data && data.length > 0) setPatientData(data[0]);
+    }
+    load();
+  }, []);
+
   return (
     <div className="space-y-6">
       <div>
@@ -118,9 +130,16 @@ const PatientRestrictedView: React.FC = () => {
         <div className="rounded-3xl bg-white p-6 border border-slate-200 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-900 mb-3">Record Summary</h2>
           <div className="space-y-3 text-sm text-slate-600">
-            <div className="rounded-2xl bg-slate-50 p-4">Latest diagnosis: Hypertension, Type 2 Diabetes</div>
-            <div className="rounded-2xl bg-slate-50 p-4">Current medication: Metformin 500mg, Lisinopril 10mg</div>
-            <div className="rounded-2xl bg-slate-50 p-4">Last lab review: HbA1c 7.2% on 2024-12-10</div>
+            {patientData ? (
+              <>
+                <div className="rounded-2xl bg-slate-50 p-4">Condition: {patientData.condition || 'N/A'}</div>
+                <div className="rounded-2xl bg-slate-50 p-4">Blood Type: {patientData.blood_type || 'N/A'}</div>
+                <div className="rounded-2xl bg-slate-50 p-4">Last Visit: {patientData.last_visit || 'N/A'}</div>
+                <div className="rounded-2xl bg-slate-50 p-4">Status: {patientData.status || 'N/A'}</div>
+              </>
+            ) : (
+              <div className="rounded-2xl bg-slate-50 p-4 text-center text-slate-400">Loading health records…</div>
+            )}
           </div>
         </div>
       </div>

@@ -98,7 +98,7 @@ export const ROLES: Record<UserRole, RoleConfig> = {
     label: 'Records Staff',
     description: 'Manage patient records',
     icon: 'FileText',
-    idFormat: 'UDHRS-REC-XXXXX',
+    idFormat: 'UDHRS-MRC-XXXXX',
     idLabel: 'Records ID',
     color: 'bg-orange-50',
     textColor: 'text-orange-700',
@@ -135,8 +135,12 @@ export const DEMO_ACCOUNTS: Record<string, { password: string; user: User }> = {
     user: { id: 'lab1', username: 'UDHRS-LAB-30001', fullName: 'Lab Technician', role: 'laboratory', idType: 'License', organization: 'Central Lab' },
   },
   'UDHRS-PHM-40001': {
-    password: 'pharmacy123',
+    password: 'pharm123',
     user: { id: 'phm1', username: 'UDHRS-PHM-40001', fullName: 'Pharmacist', role: 'pharmacy', idType: 'License', organization: 'Hospital Pharmacy' },
+  },
+  'UDHRS-MRC-50001': {
+    password: 'records123',
+    user: { id: 'mrc1', username: 'UDHRS-MRC-50001', fullName: 'Records Officer', role: 'records_staff', idType: 'Employee ID', organization: 'Medical Records Dept.' },
   },
   'UDHRS-ADM-90001': {
     password: 'admin123',
