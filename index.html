@@ -1,118 +1,100 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Supabase Connection Portal</title>
-  <!-- Modern Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
-  <!-- FontAwesome Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- Core styling -->
-  <link rel="stylesheet" href="style.css">
-  <!-- Supabase JS Client CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head>
-<body>
-  <!-- Decorative background elements -->
-  <div class="blob blob-purple"></div>
-  <div class="blob blob-cyan"></div>
-  <div class="blob blob-emerald"></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UDHRS Health Portal</title>
+    <script>
+      // Error overlay: only shown when an uncaught error or unhandled rejection occurs.
+      (function () {
+        function showOverlay(msg) {
+          try {
+            if (document.getElementById('__error_overlay')) return;
+            var d = document.createElement('div');
+            d.id = '__error_overlay';
+            d.style.position = 'fixed';
+            d.style.left = '12px';
+            d.style.right = '12px';
+            d.style.top = '12px';
+            d.style.zIndex = 999999;
+            d.style.background = 'rgba(255,16,16,0.95)';
+            d.style.color = 'white';
+            d.style.padding = '12px 16px';
+            d.style.borderRadius = '8px';
+            d.style.fontFamily = 'system-ui, Arial, sans-serif';
+            d.style.boxShadow = '0 6px 30px rgba(0,0,0,0.3)';
+            d.style.maxHeight = '60vh';
+            d.style.overflow = 'auto';
+            d.style.whiteSpace = 'pre-wrap';
+            d.textContent = msg;
+            document.addEventListener('click', function () {
+              var el = document.getElementById('__error_overlay');
+              if (el) el.style.display = 'none';
+            });
+            document.body.appendChild(d);
+          } catch (e) {
+            /* ignore */
+          }
+        }
 
-  <main class="container">
-    <header class="header">
-      <h1 class="glow-title">hii</h1>
-      <p class="subtitle">Supabase Integration Portal</p>
-    </header>
+        window.addEventListener('error', function (ev) {
+          var m = ev && ev.error && ev.error.stack ? ev.error.stack : (ev && ev.message) || String(ev);
+          showOverlay('Uncaught error:\n' + m);
+        });
 
-    <div class="grid">
-      <!-- Status Card -->
-      <section class="card glass-card status-card" id="statusCard">
-        <div class="card-header">
-          <div class="card-icon"><i class="fa-solid fa-signal"></i></div>
-          <h2>Connection Status</h2>
+        window.addEventListener('unhandledrejection', function (ev) {
+          var reason = ev && ev.reason ? (ev.reason.stack || ev.reason) : ev;
+          showOverlay('Unhandled promise rejection:\n' + String(reason));
+        });
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root">
+      <main style="font-family: system-ui, sans-serif; min-height:100vh; display:grid; place-items:center; padding:2rem; text-align:center; background:#f5f7fb;">
+        <div style="max-width:560px; width:100%; padding:24px; background:white; border-radius:24px; box-shadow:0 20px 60px rgba(0,0,0,0.08);">
+          <h1 style="margin-bottom:16px;">UDHRS Health Portal</h1>
+          <p style="margin-bottom:12px;">Static fallback: If the page remains blank, JavaScript may be blocked or failed to run.</p>
+          <code style="display:block; word-break:break-all; color:#555;">Supabase URL: https://hgfvfcfabjopphmzicyf.supabase.co</code>
         </div>
-        <div class="status-indicator-container">
-          <div class="status-pulse" id="statusPulse"></div>
-          <span class="status-text" id="statusText">Checking...</span>
-        </div>
-        <div class="status-details" id="statusDetails">
-          Initializing connection details...
-        </div>
-        <div class="action-buttons">
-          <button id="btnRetry" class="btn btn-secondary"><i class="fa-solid fa-arrows-rotate"></i> Re-check</button>
-        </div>
-      </section>
-
-      <!-- Database Tester Card -->
-      <section class="card glass-card interaction-card" id="interactionCard">
-        <div class="card-header">
-          <div class="card-icon"><i class="fa-solid fa-database"></i></div>
-          <h2>Database Interaction</h2>
-        </div>
-        <p class="description">Test insertion and retrieval of record logs in real-time.</p>
-        
-        <div class="form-group">
-          <label for="logMessage">Test Record Message</label>
-          <div class="input-with-button">
-            <input type="text" id="logMessage" placeholder="e.g., Hello from Vercel!" value="Connection test log">
-            <button id="btnInsert" class="btn btn-primary" disabled><i class="fa-solid fa-plus"></i> Write</button>
-          </div>
-        </div>
-
-        <div class="logs-container">
-          <div class="logs-header">
-            <span>Recent Test Logs</span>
-            <button id="btnClearLogs" class="btn-text" disabled>Clear DB Logs</button>
-          </div>
-          <div class="logs-list" id="logsList">
-            <div class="log-item empty-state">No logs fetched yet.</div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Supabase Setup / Configuration Card -->
-      <section class="card glass-card config-card" id="configCard">
-        <div class="card-header">
-          <div class="card-icon"><i class="fa-solid fa-sliders"></i></div>
-          <h2>Supabase Credentials</h2>
-        </div>
-        
-        <div class="alert-info" id="configSourceAlert">
-          Using credentials stored in local storage.
-        </div>
-
-        <form id="configForm" class="credentials-form">
-          <div class="form-group">
-            <label for="supabaseUrl">Supabase URL</label>
-            <div class="input-wrapper">
-              <i class="fa-solid fa-link input-icon"></i>
-              <input type="url" id="supabaseUrl" placeholder="https://xxxx.supabase.co" required>
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="supabaseKey">Supabase Anon Key</label>
-            <div class="input-wrapper">
-              <i class="fa-solid fa-key input-icon"></i>
-              <input type="password" id="supabaseKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." required>
-              <button type="button" id="toggleKeyVisibility" class="btn-icon"><i class="fa-regular fa-eye"></i></button>
-            </div>
-          </div>
-          <div class="form-actions">
-            <button type="submit" class="btn btn-primary btn-full"><i class="fa-solid fa-floppy-disk"></i> Save Credentials</button>
-            <button type="button" id="btnClearConfig" class="btn btn-danger btn-full"><i class="fa-solid fa-trash-can"></i> Clear & Disconnect</button>
-          </div>
-        </form>
-      </section>
+      </main>
     </div>
-
-    <footer class="footer">
-      <p>Powered by Supabase &bull; Deployed on Vercel</p>
-    </footer>
-  </main>
-
-  <script src="app.js"></script>
-</body>
+    <script type="module" src="/src/main.jsx"></script>
+    <script>
+      // Diagnostic badge: appears only when #root is still empty after load
+      (function(){
+        function showBadge(msg){
+          try{
+            var b = document.getElementById('__diagnostic_badge');
+            if(b) return; 
+            b = document.createElement('div');
+            b.id = '__diagnostic_badge';
+            b.textContent = msg;
+            b.style.position = 'fixed';
+            b.style.right = '12px';
+            b.style.bottom = '12px';
+            b.style.background = 'rgba(255,190,0,0.95)';
+            b.style.color = '#111';
+            b.style.padding = '6px 10px';
+            b.style.borderRadius = '8px';
+            b.style.fontFamily = 'system-ui, Arial, sans-serif';
+            b.style.zIndex = 999999;
+            b.style.cursor = 'pointer';
+            b.onclick = function(){ b.style.display='none'; };
+            document.body.appendChild(b);
+          }catch(e){}
+        }
+        window.addEventListener('load', function(){
+          setTimeout(function(){
+            try{
+              var root = document.getElementById('root');
+              if(!root || (root && root.children.length === 0 && (root.textContent||'').trim()==='')){
+                showBadge('Diagnostic: root empty');
+              }
+            }catch(e){ showBadge('Diagnostic: error checking root'); }
+          },1500);
+        });
+      })();
+    </script>
+  </body>
 </html>
