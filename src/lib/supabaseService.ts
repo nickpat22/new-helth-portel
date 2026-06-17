@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { DEMO_ACCOUNTS } from '../auth/types';
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -253,19 +254,55 @@ export async function getDashboardStats() {
   };
 }
 
-// ── REGISTRATION ─────────────────────────────────────────
+function generateRandomUserId(role: string): string {
+  const rolePrefixes: Record<string, string> = {
+    patient: 'UDHRS-PAT-',
+    doctor: 'UDHRS-DOC-',
+    laboratory: 'UDHRS-LAB-',
+    pharmacy: 'UDHRS-PHM-',
+    records_staff: 'UDHRS-MRC-',
+    admin: 'UDHRS-ADM-',
+  };
+  const prefix = rolePrefixes[role] || 'UDHRS-USR-';
+  const randNum = Math.floor(Math.random() * 90000) + 10000;
+  return `${prefix}${randNum}`;
+}
 
 export async function registerUser(user: {
   full_name: string; email: string; password: string; role: string;
 }) {
+  let userId = '';
+  let unique = false;
+  let attempts = 0;
+
+  while (!unique && attempts < 5) {
+    userId = generateRandomUserId(user.role);
+    if (DEMO_ACCOUNTS[userId]) {
+      attempts++;
+      continue;
+    }
+    const { data: existing } = await supabase
+      .from('registered_users')
+      .select('user_id')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!existing) {
+      unique = true;
+    } else {
+      attempts++;
+    }
+  }
+
   const { data, error } = await supabase
     .from('registered_users')
     .insert([{
+      user_id: userId,
       full_name: user.full_name,
       email: user.email,
-      password_hash: user.password, // In production, hash this server-side
+      password_hash: user.password,
       role: user.role,
-      status: 'pending',
+      status: 'approved',
     }])
     .select()
     .single();

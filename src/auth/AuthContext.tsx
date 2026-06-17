@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole, ROLES, DEMO_ACCOUNTS } from './types';
+import { supabase } from '../lib/supabaseClient';
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (userId: string, password: string) => { success: boolean; error?: string };
+  login: (userId: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   selectedRole: UserRole | null;
   setSelectedRole: (role: UserRole | null) => void;
@@ -25,29 +26,80 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const login = (userId: string, password: string): { success: boolean; error?: string } => {
+  const login = async (userId: string, password: string): Promise<{ success: boolean; error?: string }> => {
     const trimmedId = userId.trim();
+    
+    // 1. Check demo accounts first
     const account = DEMO_ACCOUNTS[trimmedId as keyof typeof DEMO_ACCOUNTS];
-    if (!account) {
-      return { success: false, error: 'Invalid user ID. Please check and try again.' };
+    if (account) {
+      if (selectedRole && account.user.role !== selectedRole) {
+        return {
+          success: false,
+          error: `This ID belongs to a ${account.user.role} account. Please select the correct role.`,
+        };
+      }
+
+      if (account.password !== password) {
+        return { success: false, error: 'Invalid password. Please check and try again.' };
+      }
+
+      const userData = account.user;
+      setUser(userData);
+      setSelectedRole(userData.role);
+      localStorage.setItem('user', JSON.stringify(userData));
+      return { success: true };
     }
 
-    if (selectedRole && account.user.role !== selectedRole) {
-      return {
-        success: false,
-        error: `This ID belongs to a ${account.user.role} account. Please select the correct role.`,
+    // 2. If not demo account, check database
+    try {
+      const { data: dbUser, error } = await supabase
+        .from('registered_users')
+        .select('*')
+        .eq('user_id', trimmedId)
+        .maybeSingle();
+
+      if (error) {
+        return { success: false, error: 'Database connection error: ' + error.message };
+      }
+
+      if (!dbUser) {
+        return { success: false, error: 'Invalid user ID. Please check and try again.' };
+      }
+
+      if (selectedRole && dbUser.role !== selectedRole) {
+        return {
+          success: false,
+          error: `This ID belongs to a ${dbUser.role} account. Please select the correct role.`,
+        };
+      }
+
+      if (dbUser.password_hash !== password) {
+        return { success: false, error: 'Invalid password. Please check and try again.' };
+      }
+
+      if (dbUser.status === 'pending') {
+        return { success: false, error: 'Your account is pending approval by the administrator.' };
+      }
+
+      if (dbUser.status === 'rejected') {
+        return { success: false, error: 'Your registration request has been rejected.' };
+      }
+
+      const userData: User = {
+        id: `db-${dbUser.id}`,
+        username: dbUser.user_id,
+        fullName: dbUser.full_name,
+        role: dbUser.role as UserRole,
+        idType: 'System Generated ID',
       };
-    }
 
-    if (account.password !== password) {
-      return { success: false, error: 'Invalid password. Please check and try again.' };
+      setUser(userData);
+      setSelectedRole(userData.role);
+      localStorage.setItem('user', JSON.stringify(userData));
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: 'An unexpected error occurred: ' + err.message };
     }
-
-    const userData = account.user;
-    setUser(userData);
-    setSelectedRole(userData.role);
-    localStorage.setItem('user', JSON.stringify(userData));
-    return { success: true };
   };
 
   const logout = () => {

@@ -117,6 +117,7 @@ CREATE POLICY "Allow authenticated full access on activity_log" ON public.activi
 -- 8. REGISTERED USERS (for the registration form)
 CREATE TABLE IF NOT EXISTS public.registered_users (
   id SERIAL PRIMARY KEY,
+  user_id TEXT UNIQUE NOT NULL,
   full_name TEXT NOT NULL,
   email TEXT NOT NULL,
   password_hash TEXT NOT NULL,

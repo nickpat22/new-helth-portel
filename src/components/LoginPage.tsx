@@ -32,7 +32,7 @@ const LoginPage: React.FC = () => {
     setLoading(false);
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setMessage('');
@@ -48,14 +48,12 @@ const LoginPage: React.FC = () => {
     }
 
     setLoading(true);
-    setTimeout(() => {
-      const result = login(userId, password);
-      setLoading(false);
+    const result = await login(userId, password);
+    setLoading(false);
 
-      if (!result.success) {
-        setError(result.error || 'Login failed.');
-      }
-    }, 600);
+    if (!result.success) {
+      setError(result.error || 'Login failed.');
+    }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -73,7 +71,7 @@ const LoginPage: React.FC = () => {
     }
 
     setLoading(true);
-    const { error } = await registerUser({
+    const { data, error } = await registerUser({
       full_name: regName.trim(),
       email: regEmail.trim(),
       password: regPassword,
@@ -84,7 +82,7 @@ const LoginPage: React.FC = () => {
       setError('Registration failed: ' + error.message);
     } else {
       await logActivity('login', `New ${selectedRole} registration: ${regName.trim()}`, regName.trim());
-      setMessage('Registration submitted successfully! Your account is pending approval. Use your credentials to sign in once approved.');
+      setMessage(`Registration completed successfully! Your Login ID is: ${data?.user_id}. Use this ID and your password to sign in.`);
       setRegName('');
       setRegEmail('');
       setRegPassword('');
