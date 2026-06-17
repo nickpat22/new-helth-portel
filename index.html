@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Supabase Connection Portal</title>
+  <!-- Modern Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Core styling -->
+  <link rel="stylesheet" href="style.css">
+  <!-- Supabase JS Client CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <!-- Decorative background elements -->
+  <div class="blob blob-purple"></div>
+  <div class="blob blob-cyan"></div>
+  <div class="blob blob-emerald"></div>
+
+  <main class="container">
+    <header class="header">
+      <h1 class="glow-title">hii</h1>
+      <p class="subtitle">Supabase Integration Portal</p>
+    </header>
+
+    <div class="grid">
+      <!-- Status Card -->
+      <section class="card glass-card status-card" id="statusCard">
+        <div class="card-header">
+          <div class="card-icon"><i class="fa-solid fa-signal"></i></div>
+          <h2>Connection Status</h2>
+        </div>
+        <div class="status-indicator-container">
+          <div class="status-pulse" id="statusPulse"></div>
+          <span class="status-text" id="statusText">Checking...</span>
+        </div>
+        <div class="status-details" id="statusDetails">
+          Initializing connection details...
+        </div>
+        <div class="action-buttons">
+          <button id="btnRetry" class="btn btn-secondary"><i class="fa-solid fa-arrows-rotate"></i> Re-check</button>
+        </div>
+      </section>
+
+      <!-- Database Tester Card -->
+      <section class="card glass-card interaction-card" id="interactionCard">
+        <div class="card-header">
+          <div class="card-icon"><i class="fa-solid fa-database"></i></div>
+          <h2>Database Interaction</h2>
+        </div>
+        <p class="description">Test insertion and retrieval of record logs in real-time.</p>
+        
+        <div class="form-group">
+          <label for="logMessage">Test Record Message</label>
+          <div class="input-with-button">
+            <input type="text" id="logMessage" placeholder="e.g., Hello from Vercel!" value="Connection test log">
+            <button id="btnInsert" class="btn btn-primary" disabled><i class="fa-solid fa-plus"></i> Write</button>
+          </div>
+        </div>
+
+        <div class="logs-container">
+          <div class="logs-header">
+            <span>Recent Test Logs</span>
+            <button id="btnClearLogs" class="btn-text" disabled>Clear DB Logs</button>
+          </div>
+          <div class="logs-list" id="logsList">
+            <div class="log-item empty-state">No logs fetched yet.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Supabase Setup / Configuration Card -->
+      <section class="card glass-card config-card" id="configCard">
+        <div class="card-header">
+          <div class="card-icon"><i class="fa-solid fa-sliders"></i></div>
+          <h2>Supabase Credentials</h2>
+        </div>
+        
+        <div class="alert-info" id="configSourceAlert">
+          Using credentials stored in local storage.
+        </div>
+
+        <form id="configForm" class="credentials-form">
+          <div class="form-group">
+            <label for="supabaseUrl">Supabase URL</label>
+            <div class="input-wrapper">
+              <i class="fa-solid fa-link input-icon"></i>
+              <input type="url" id="supabaseUrl" placeholder="https://xxxx.supabase.co" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="supabaseKey">Supabase Anon Key</label>
+            <div class="input-wrapper">
+              <i class="fa-solid fa-key input-icon"></i>
+              <input type="password" id="supabaseKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." required>
+              <button type="button" id="toggleKeyVisibility" class="btn-icon"><i class="fa-regular fa-eye"></i></button>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-full"><i class="fa-solid fa-floppy-disk"></i> Save Credentials</button>
+            <button type="button" id="btnClearConfig" class="btn btn-danger btn-full"><i class="fa-solid fa-trash-can"></i> Clear & Disconnect</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <footer class="footer">
+      <p>Powered by Supabase &bull; Deployed on Vercel</p>
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
