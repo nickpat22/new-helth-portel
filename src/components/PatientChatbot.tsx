@@ -44,7 +44,7 @@ export function PatientChatbot({ patientId }: { patientId: string }) {
       // 1. Send to AI API (Gemini format)
       const API_KEY = import.meta.env.VITE_AI_API_KEY || "";
       
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${API_KEY}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
