@@ -33,32 +33,34 @@ export function ScanDocument({ uploaderId, uploaderRole }: { uploaderId: string;
       });
 
       // 2. Call AI Vision API for OCR and extraction
-      // Using generic OpenAI-compatible endpoint with vision capabilities
       const API_KEY = import.meta.env.VITE_AI_API_KEY || "";
       
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${API_KEY}`,
         },
         body: JSON.stringify({
-          model: "gpt-4-vision-preview", // Placeholder
-          messages: [
-            {
-              role: "system",
-              content: "You are a medical document OCR assistant. Extract the following details from the uploaded document and return ONLY a JSON object: { \"patient_id\": \"\", \"document_type\": \"\", \"diagnosis\": \"\", \"doctor_name\": \"\", \"report_date\": \"\", \"extracted_text\": \"<full text>\" }. Ensure date is YYYY-MM-DD. Guess document type (Lab Report, Prescription, Medical Record). Patient ID often looks like PATxxxx."
-            },
+          contents: [
             {
               role: "user",
-              content: [
-                { type: "text", text: "Extract the data from this document." },
-                { type: "image_url", image_url: { url: `data:${file.type};base64,${base64}` } }
+              parts: [
+                {
+                  text: `Extract the following details from this medical document and return ONLY a JSON object exactly matching this format: 
+{ "patient_id": "", "diagnosis": "...", "doctor_name": "...", "report_date": "YYYY-MM-DD", "document_type": "...", "extracted_text": "..." }
+
+If a field is missing, use "Unknown".`
+                },
+                {
+                  inlineData: {
+                    mimeType: file.type,
+                    data: base64Data.split(",")[1]
+                  }
+                }
               ]
             }
-          ],
-          max_tokens: 1500
-        }),
+          ]
+        })
       });
 
       let jsonResult: any = null;

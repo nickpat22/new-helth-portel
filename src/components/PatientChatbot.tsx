@@ -41,29 +41,21 @@ export function PatientChatbot({ patientId }: { patientId: string }) {
     setHistory((h) => [...h, { id: tempId, message: userMsg, response: null }]);
 
     try {
-      // 1. Send to AI API
-      // Using generic OpenAI-compatible endpoint format as fallback, 
+      // 1. Send to AI API (Gemini format)
       const API_KEY = import.meta.env.VITE_AI_API_KEY || "";
       
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${API_KEY}`,
         },
         body: JSON.stringify({
-          model: "gpt-3.5-turbo", // Placeholder, depends on actual provider behind the AQ key
-          messages: [
-            {
-              role: "system",
-              content:
-                "You are an informational health assistant for patients. You can explain diseases, reports, medical terms, lab values, give health education, explain prescriptions, and offer lifestyle suggestions. CRITICAL RULES: Never prescribe medicines. Never recommend dosages. Never replace doctors. Always include a disclaimer that you are an informational assistant and cannot prescribe medications or provide medical treatment.",
-            },
+          contents: [
             ...history.map((h) => [
-              { role: "user", content: h.message },
-              { role: "assistant", content: h.response || "" },
-            ]).flat().filter(m => m.content),
-            { role: "user", content: userMsg },
+              { role: "user", parts: [{ text: h.message }] },
+              { role: "model", parts: [{ text: h.response || "" }] },
+            ]).flat().filter(m => m.parts[0].text),
+            { role: "user", parts: [{ text: "SYSTEM INSTRUCTION: You are an informational health assistant for patients. You can explain diseases, reports, medical terms, lab values, give health education, explain prescriptions, and offer lifestyle suggestions. CRITICAL RULES: Never prescribe medicines. Never recommend dosages. Never replace doctors. Always include a disclaimer that you are an informational assistant and cannot prescribe medications or provide medical treatment. \n\nPATIENT MESSAGE: " + userMsg }] },
           ],
         }),
       });
@@ -72,11 +64,11 @@ export function PatientChatbot({ patientId }: { patientId: string }) {
       
       if (res.ok) {
         const data = await res.json();
-        aiResponseText = data.choices?.[0]?.message?.content || aiResponseText;
+        aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || aiResponseText;
       } else {
-        // Fallback for demo or if the API key domain is different
-        console.warn("AI API Error:", await res.text());
-        aiResponseText = "I am a prototype informational assistant. Please configure the correct API endpoint. Note: I cannot prescribe medications or provide medical treatment.";
+        const errText = await res.text();
+        console.warn("AI API Error:", errText);
+        throw new Error(errText);
       }
 
       // 2. Save to database
@@ -94,9 +86,10 @@ export function PatientChatbot({ patientId }: { patientId: string }) {
 
       // Update UI
       setHistory((h) => h.map((item) => (item.id === tempId ? inserted : item)));
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setHistory((h) => h.map((item) => (item.id === tempId ? { ...item, response: "An error occurred connecting to the assistant." } : item)));
+      const errMsg = err?.message || err?.toString() || "Unknown error";
+      setHistory((h) => h.map((item) => (item.id === tempId ? { ...item, response: `Error: ${errMsg}` } : item)));
     } finally {
       setBusy(false);
     }
