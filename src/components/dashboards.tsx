@@ -2,7 +2,9 @@ import React, { useEffect, useState } from "react";
 import { C, btn, card } from "./theme";
 import { Badge, DataTable, Field, Input, Msg, Select, Spinner, StatCard, Textarea } from "./shared";
 import { DashLayout, NavItem } from "./DashLayout";
-import { ROLE_BADGE, supabase } from "../lib/supa";
+import { ROLE_BADGE, supabase, idToEmail, newId } from "../lib/supa";
+import { PatientChatbot } from "./PatientChatbot";
+import { ScanDocument } from "./ScanDocument";
 
 function fmtDate(s?: string | null) {
   if (!s) return "—";
@@ -11,10 +13,15 @@ function fmtDate(s?: string | null) {
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function ProfileView({ user }: { user: any }) {
+function ProfileView({ user, onLogout }: { user: any; onLogout?: () => void }) {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  // Delete account state
+  const [deleting, setDeleting] = useState(false);
+  const [delPw, setDelPw] = useState("");
+  const [delErr, setDelErr] = useState("");
 
   // States for all editable fields
   const [name, setName] = useState(user.name || "");
@@ -68,6 +75,43 @@ function ProfileView({ user }: { user: any }) {
       setBusy(false);
     }
   }
+
+  async function handleDeleteAccount(e: React.FormEvent) {
+    e.preventDefault();
+    setDelErr("");
+    if (!delPw) return setDelErr("Please enter your password.");
+    setBusy(true);
+    try {
+      const { data: realEmail } = await supabase.rpc("get_email_from_id", { display_id: user.id });
+      const emailToLogin = realEmail || idToEmail(user.id);
+
+      const { error: pwErr } = await supabase.auth.signInWithPassword({ email: emailToLogin, password: delPw });
+      if (pwErr) {
+        setDelErr("Incorrect password.");
+        setBusy(false);
+        return;
+      }
+
+      if (user.role === "Laboratory Staff" || user.role === "Medical Records Staff" || user.role === "Doctor") {
+        const { data: scans } = await supabase.from("document_scans").select("file_path").eq("uploaded_by", user.id).not("file_path", "is", null);
+        if (scans && scans.length > 0) {
+          const paths = scans.map((s: any) => s.file_path);
+          await supabase.storage.from("medical-files").remove(paths);
+        }
+      }
+
+      const { error: rpcErr } = await supabase.rpc("delete_own_account");
+      if (rpcErr) throw rpcErr;
+      
+      await supabase.auth.signOut();
+      if (onLogout) onLogout();
+      window.location.reload();
+    } catch (e: any) {
+      setDelErr(e.message || "Failed to delete account.");
+      setBusy(false);
+    }
+  }
+
 
   const renderField = (label: string, value: string, setter: (v: string) => void, type = "text", options?: string[]) => {
     if (!editing) {
@@ -168,6 +212,38 @@ function ProfileView({ user }: { user: any }) {
           )}
         </div>
       </form>
+
+      {!editing && (
+        <div style={{ marginTop: 40, paddingTop: 20, borderTop: `1px solid ${C.border}` }}>
+          <h3 style={{ color: "#d32f2f", margin: "0 0 10px", fontSize: 16 }}>Danger Zone</h3>
+          {!deleting ? (
+            <button 
+              style={{ ...btn("ghost"), color: "#d32f2f", borderColor: "#ffcdd2", background: "#ffebee", width: "100%" }}
+              onClick={() => setDeleting(true)}
+            >
+              Delete Account
+            </button>
+          ) : (
+            <form onSubmit={handleDeleteAccount} style={{ background: "#ffebee", padding: 16, borderRadius: 8, border: "1px solid #ffcdd2" }}>
+              <p style={{ margin: "0 0 12px", color: "#c62828", fontSize: 14 }}>
+                <strong>Warning:</strong> This will permanently delete your profile, messages, records owned by you, and your login account. This cannot be undone.
+              </p>
+              {delErr && <Msg kind="err">{delErr}</Msg>}
+              <Field label="Confirm Password to Delete">
+                <Input type="password" value={delPw} onChange={e => setDelPw(e.target.value)} required />
+              </Field>
+              <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+                <button type="button" style={btn("ghost")} onClick={() => { setDeleting(false); setDelErr(""); setDelPw(""); }} disabled={busy}>
+                  Cancel
+                </button>
+                <button type="submit" style={{ ...btn("primary"), background: "#d32f2f", borderColor: "#d32f2f", flex: 1 }} disabled={busy}>
+                  {busy ? "Deleting…" : "Permanently Delete"}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -259,8 +335,9 @@ export function PatientDashboard({ user, onLogout }: { user: any; onLogout: () =
           rows={rx.map((r) => [r.id, r.diagnosis || "—", r.drugs || "—", fmtDate(r.created_at)])}
         />
       ) : (
-        <ProfileView user={user} />
+        <ProfileView user={user} onLogout={onLogout} />
       )}
+      <PatientChatbot patientId={user.id} />
     </DashLayout>
   );
 }
@@ -272,6 +349,7 @@ export function DoctorDashboard({ user, onLogout }: { user: any; onLogout: () =>
     { key: "search", icon: "🔍", label: "Patient Search" },
     { key: "diag", icon: "🩺", label: "Add Diagnosis" },
     { key: "rx", icon: "💊", label: "Add Prescription" },
+    { key: "scan", icon: "📄", label: "Scan Document" },
     { key: "profile", icon: "👤", label: "Profile" },
   ];
 
@@ -280,7 +358,8 @@ export function DoctorDashboard({ user, onLogout }: { user: any; onLogout: () =>
       {active === "search" && <PatientSearch showDocs={false} />}
       {active === "diag" && <AddDiagnosis doctorId={user.id} />}
       {active === "rx" && <AddPrescription doctorId={user.id} />}
-      {active === "profile" && <ProfileView user={user} />}
+      {active === "scan" && <ScanDocument uploaderId={user.id} uploaderRole={user.role} />}
+      {active === "profile" && <ProfileView user={user} onLogout={onLogout} />}
     </DashLayout>
   );
 }
@@ -331,6 +410,30 @@ function PatientSearch({ showDocs }: { showDocs: boolean }) {
     }
   }
 
+  async function deleteRecord(table: string, id: string, file_path?: string) {
+    if (!confirm("Are you sure you want to delete this record?")) return;
+    setBusy(true);
+    try {
+      if (file_path) {
+        await supabase.storage.from("medical-files").remove([file_path]);
+      }
+      const { error } = await supabase.from(table).delete().eq("id", id);
+      if (error) throw error;
+      setErr("");
+      alert("Record deleted successfully.");
+      // Refresh search
+      search(new Event("submit") as any);
+    } catch (e: any) {
+      setErr(e.message || "Failed to delete record.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const delBtn = (table: string, id: string, file_path?: string) => (
+    <button style={{ ...btn("ghost"), color: "#d32f2f", padding: "4px 8px", fontSize: 12 }} onClick={() => deleteRecord(table, id, file_path)}>Delete</button>
+  );
+
   return (
     <>
       <form onSubmit={search} style={{ ...card, display: "flex", gap: 10, alignItems: "flex-end", maxWidth: 560 }}>
@@ -356,15 +459,15 @@ function PatientSearch({ showDocs }: { showDocs: boolean }) {
             </div>
           </div>
           <SectionTitle>Diagnoses</SectionTitle>
-          <DataTable cols={["Diagnosis", "Symptoms", "Treatment", "Date"]} rows={diag.map((d) => [d.title, d.symptoms, d.treatment, fmtDate(d.created_at)])} />
+          <DataTable cols={["Diagnosis", "Symptoms", "Treatment", "Date", ""]} rows={diag.map((d) => [d.title, d.symptoms, d.treatment, fmtDate(d.created_at), delBtn('diagnoses', d.id)])} />
           <SectionTitle>Lab Reports</SectionTitle>
-          <DataTable cols={["Test", "Date", "Status", "Summary"]} rows={labs.map((l) => [l.test_name, fmtDate(l.test_date || l.created_at), <Badge key={l.id} color={C.success}>{l.status || "Completed"}</Badge>, l.summary])} />
+          <DataTable cols={["Test", "Date", "Status", "Summary", ""]} rows={labs.map((l) => [l.test_name, fmtDate(l.test_date || l.created_at), <Badge key={l.id} color={C.success}>{l.status || "Completed"}</Badge>, l.summary, delBtn('lab_reports', l.id)])} />
           <SectionTitle>Prescriptions</SectionTitle>
-          <DataTable cols={["Diagnosis", "Medications", "Date"]} rows={rx.map((r) => [r.diagnosis, r.drugs, fmtDate(r.created_at)])} />
+          <DataTable cols={["Diagnosis", "Medications", "Date", ""]} rows={rx.map((r) => [r.diagnosis, r.drugs, fmtDate(r.created_at), delBtn('prescriptions', r.id)])} />
           {showDocs && (
             <>
               <SectionTitle>Medical Documents</SectionTitle>
-              <DataTable cols={["Type", "Date", "Notes"]} rows={docs.map((d) => [d.doc_type, fmtDate(d.doc_date || d.created_at), d.notes])} />
+              <DataTable cols={["Type", "Date", "Notes", ""]} rows={docs.map((d) => [d.doc_type, fmtDate(d.doc_date || d.created_at), d.notes, delBtn('medical_docs', d.id, d.file_path)])} />
             </>
           )}
         </>
@@ -484,13 +587,15 @@ export function LabDashboard({ user, onLogout }: { user: any; onLogout: () => vo
   const nav: NavItem[] = [
     { key: "upload", icon: "📤", label: "Upload Report" },
     { key: "submitted", icon: "📋", label: "Submitted Reports" },
+    { key: "scan", icon: "📄", label: "Scan Document" },
     { key: "profile", icon: "👤", label: "Profile" },
   ];
   return (
     <DashLayout user={user} nav={nav} active={active} setActive={setActive} onLogout={onLogout}>
       {active === "upload" && <UploadLabReport labId={user.id} />}
       {active === "submitted" && <SubmittedLabReports labId={user.id} />}
-      {active === "profile" && <ProfileView user={user} />}
+      {active === "scan" && <ScanDocument uploaderId={user.id} uploaderRole={user.role} />}
+      {active === "profile" && <ProfileView user={user} onLogout={onLogout} />}
     </DashLayout>
   );
 }
@@ -567,13 +672,15 @@ export function MRSDashboard({ user, onLogout }: { user: any; onLogout: () => vo
   const nav: NavItem[] = [
     { key: "search", icon: "🔍", label: "Patient Search" },
     { key: "upload", icon: "📤", label: "Upload Document" },
+    { key: "scan", icon: "📄", label: "Scan Document" },
     { key: "profile", icon: "👤", label: "Profile" },
   ];
   return (
     <DashLayout user={user} nav={nav} active={active} setActive={setActive} onLogout={onLogout}>
       {active === "search" && <PatientSearch showDocs />}
       {active === "upload" && <UploadDoc staffId={user.id} />}
-      {active === "profile" && <ProfileView user={user} />}
+      {active === "scan" && <ScanDocument uploaderId={user.id} uploaderRole={user.role} />}
+      {active === "profile" && <ProfileView user={user} onLogout={onLogout} />}
     </DashLayout>
   );
 }

@@ -15,10 +15,28 @@ type Stage =
   | { name: "choice"; role: string }
   | { name: "register"; role: string }
   | { name: "created"; role: string; userId: string }
-  | { name: "login"; role: string };
+  | { name: "login"; role: string }
+  | { name: "forgot_password" }
+  | { name: "reset_password" };
 
 export function AuthFlow({ onLoggedIn }: { onLoggedIn: () => void | Promise<void> }) {
-  const [stage, setStage] = useState<Stage>({ name: "welcome" });
+  const [stage, setStage] = useState<Stage>(() => {
+    if (window.location.hash.includes("type=recovery")) {
+      return { name: "reset_password" };
+    }
+    return { name: "welcome" };
+  });
+
+  // Keep hash listener for recovery links
+  React.useEffect(() => {
+    const handleHash = () => {
+      if (window.location.hash.includes("type=recovery")) {
+        setStage({ name: "reset_password" });
+      }
+    };
+    window.addEventListener("hashchange", handleHash);
+    return () => window.removeEventListener("hashchange", handleHash);
+  }, []);
 
   return (
     <div
@@ -61,7 +79,17 @@ export function AuthFlow({ onLoggedIn }: { onLoggedIn: () => void | Promise<void
             role={stage.role}
             onBack={() => setStage({ name: "choice", role: stage.role })}
             onLoggedIn={onLoggedIn}
+            onForgotPassword={() => setStage({ name: "forgot_password" })}
           />
+        )}
+        {stage.name === "forgot_password" && (
+          <ForgotPasswordForm onBack={() => setStage({ name: "welcome" })} />
+        )}
+        {stage.name === "reset_password" && (
+          <ResetPasswordForm onComplete={() => {
+            window.location.hash = "";
+            setStage({ name: "welcome" });
+          }} />
         )}
       </main>
       <footer style={{ textAlign: "center", padding: "12px 20px 28px", color: C.muted, fontSize: 13 }}>
@@ -251,7 +279,7 @@ function RegisterForm({
         "Medical Records Staff": "mrs",
       };
 
-      // 1. Pre-allocate the sequential ID so we can build the stable email
+      // 1. Pre-allocate the sequential ID
       const { data: nextNum, error: rpcErr } = await supabase.rpc(
         "get_next_id",
         { role_key: roleKeyMap[role] }
@@ -259,11 +287,11 @@ function RegisterForm({
       if (rpcErr) throw new Error(`Could not allocate ID: ${rpcErr.message}`);
 
       const displayId = `${ROLE_PREFIX[role]}${nextNum}`;
-      const syntheticEmail = idToEmail(displayId);
 
       // 2. Sign up — pass display_id in metadata so the trigger can use it directly
       const { data: authData, error: authErr } = await supabase.auth.signUp({
-        email: syntheticEmail,
+        email: form.email || idToEmail(displayId), // Use real email if provided
+
         password: pw,
         options: {
           data: {
@@ -379,10 +407,12 @@ function LoginForm({
   role,
   onBack,
   onLoggedIn,
+  onForgotPassword,
 }: {
   role: string;
   onBack: () => void;
   onLoggedIn: () => void | Promise<void>;
+  onForgotPassword: () => void;
 }) {
   const [id, setId] = useState("");
   const [pw, setPw] = useState("");
@@ -396,8 +426,15 @@ function LoginForm({
     setBusy(true);
     try {
       const displayId = id.trim().toUpperCase();
-      const email = idToEmail(displayId);
-      const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
+      let emailToLogin = idToEmail(displayId);
+      
+      // Attempt to resolve real email if available
+      const { data: realEmail } = await supabase.rpc("get_email_from_id", { display_id: displayId });
+      if (realEmail) {
+        emailToLogin = realEmail;
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({ email: emailToLogin, password: pw });
       if (error) {
         setErr("Incorrect ID or password.");
         return;
@@ -445,8 +482,111 @@ function LoginForm({
               {busy ? "Signing in…" : "Sign In"}
             </button>
           </div>
+          <div style={{ textAlign: "center", marginTop: 16 }}>
+            <button
+              type="button"
+              style={{ ...btn("ghost"), color: C.primary, fontSize: 13, padding: 0 }}
+              onClick={onForgotPassword}
+            >
+              Forgot Password?
+            </button>
+          </div>
         </form>
         {busy && <div style={{ marginTop: 12 }}><Spinner /></div>}
+      </div>
+    </div>
+  );
+}
+
+function ForgotPasswordForm({ onBack }: { onBack: () => void }) {
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + "/#reset-password",
+      });
+      if (error) throw error;
+      setMsg({ kind: "ok", text: "Password reset instructions sent to your email." });
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e.message || "Failed to send reset email." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ maxWidth: 440, margin: "0 auto" }}>
+      <h2 style={{ marginTop: 0 }}>Forgot Password</h2>
+      <div style={card}>
+        {msg && <Msg kind={msg.kind}>{msg.text}</Msg>}
+        <p style={{ fontSize: 14, color: C.muted, marginBottom: 16 }}>
+          Enter your registered email address and we'll send you instructions to reset your password.
+        </p>
+        <form onSubmit={submit}>
+          <Field label="Email Address">
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </Field>
+          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+            <button type="button" style={btn("ghost")} onClick={onBack} disabled={busy}>
+              ← Back
+            </button>
+            <button type="submit" style={{ ...btn("primary"), flex: 1 }} disabled={busy}>
+              {busy ? "Sending…" : "Send Reset Link"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ResetPasswordForm({ onComplete }: { onComplete: () => void }) {
+  const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (pw.length < 8) return setErr("Password must be at least 8 characters.");
+    if (pw !== pw2) return setErr("Passwords do not match.");
+    setBusy(true);
+    setErr("");
+    try {
+      const { error } = await supabase.auth.updateUser({ password: pw });
+      if (error) throw error;
+      alert("Password updated successfully! Please sign in again.");
+      onComplete();
+    } catch (e: any) {
+      setErr(e.message || "Failed to reset password.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ maxWidth: 440, margin: "0 auto" }}>
+      <h2 style={{ marginTop: 0 }}>Set New Password</h2>
+      <div style={card}>
+        {err && <Msg kind="err">{err}</Msg>}
+        <form onSubmit={submit}>
+          <Field label="New Password (min 8 characters)">
+            <Input type="password" value={pw} onChange={(e) => setPw(e.target.value)} />
+          </Field>
+          <Field label="Confirm New Password">
+            <Input type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} />
+          </Field>
+          <button type="submit" style={{ ...btn("primary"), width: "100%", marginTop: 16 }} disabled={busy}>
+            {busy ? "Saving…" : "Update Password"}
+          </button>
+        </form>
       </div>
     </div>
   );
