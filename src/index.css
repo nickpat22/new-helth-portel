@@ -36,3 +36,8 @@
     border-radius: 20px;
   }
 }
+
+@keyframes documed-spin {
+  to { transform: rotate(360deg); }
+}
+
