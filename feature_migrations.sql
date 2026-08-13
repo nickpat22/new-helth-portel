@@ -80,14 +80,15 @@ CREATE POLICY "chat delete self" ON public.chat_history FOR DELETE TO authentica
 GRANT SELECT, INSERT, DELETE ON public.document_scans TO authenticated;
 GRANT SELECT, INSERT, DELETE ON public.chat_history TO authenticated;
 -- Feature 1: Get real email by ID for login
-CREATE OR REPLACE FUNCTION get_email_from_id(display_id text) RETURNS text AS $$$
+CREATE OR REPLACE FUNCTION get_email_from_id(display_id text) RETURNS text AS $$
 DECLARE
   user_email text;
 BEGIN
   SELECT email INTO user_email FROM public.users WHERE id = display_id;
   RETURN user_email;
 END;
-$$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 
 -- Feature 1: Update existing users to use real email in auth.users
 UPDATE auth.users

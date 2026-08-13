@@ -27,6 +27,12 @@ export function idToEmail(displayId: string) {
   return `${displayId.trim().toLowerCase()}@documed.com`;
 }
 
+export function newId(prefix: string) {
+  const num = Math.floor(Math.random() * 900000) + 100000;
+  return `${prefix}${num}`;
+}
+
+
 // Fetch the profile row for the currently signed-in auth user.
 export async function fetchMyProfile() {
   const { data: auth } = await supabase.auth.getUser();
